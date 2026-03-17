@@ -1,4 +1,4 @@
-name: Ultimate-Direct-Stream-Final
+name: Ultimate-Direct-Stream-With-Link
 on:
   workflow_dispatch:
 
@@ -9,31 +9,36 @@ jobs:
       - name: Setup Tools & Localtonet
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg curl python3 unzip
-          # تحميل الأداة بسرعة
+          sudo apt-get install -y ffmpeg curl python3 unzip jq
           curl -L https://localtonet.com/download/localtonet-linux-x64.zip -o lt.zip
           unzip lt.zip
           chmod +x localtonet
 
-      - name: Launch Stream & Tunnel
+      - name: Launch Stream & Show Link
         env:
           LT_TOKEN: ${{ secrets.LOCALTONET_TOKEN }}
         run: |
-          # تفعيل التوكن أولاً بشكل منفصل (حل مشكلة Wrong Token)
+          # تفعيل التوكن
           ./localtonet authtoken $LT_TOKEN
           
-          # تشغيل النفق على المنفذ 8080 في الخلفية
+          # تشغيل النفق وإظهار الرابط
           ./localtonet http -p 8080 &
           
-          # انتظار بسيط لربط السيرفر
-          sleep 15
+          echo "جاري استخراج الرابط المباشر... انتظر 20 ثانية"
+          sleep 20
           
-          # تجهيز مجلد البث وسيرفر الويب
+          # استخراج الرابط وطباعته بشكل واضح
+          PUBLIC_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+          echo "----------------------------------------------------"
+          echo "رابط البث الخاص بك هو:"
+          echo "$PUBLIC_URL/index.m3u8"
+          echo "----------------------------------------------------"
+          
+          # تجهيز المجلد والبث
           mkdir -p live
           cd live
           python3 -m http.server 8080 &
           
-          # أمر البث الاحترافي (نظام 28 ثانية - تأخير 0)
           ffmpeg -re -i "http://webplayerx.org:8080/bn1hd/index.m3u8" \
             -c copy \
             -f hls \
