@@ -1,4 +1,4 @@
-name: Nginx-Ultra-Stream
+name: Nginx-Direct-Stream
 on:
   workflow_dispatch:
 
@@ -6,16 +6,15 @@ jobs:
   run-stream:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Nginx & FFmpeg
+      - name: Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y nginx ffmpeg curl
-          # تثبيت Ngrok
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
           sudo apt-get update && sudo apt-get install ngrok
 
-      - name: Configure Nginx & Permissions
+      - name: Configure Nginx & Bypass Warning
         run: |
           sudo bash -c 'cat <<EOF > /etc/nginx/sites-available/default
           server {
@@ -23,6 +22,8 @@ jobs:
               location / {
                   root /var/www/html/live;
                   add_header Access-Control-Allow-Origin *;
+                  # هذا السطر يمنع ظهور صفحة تحذير ngrok نهائياً
+                  add_header ngrok-skip-browser-warning "true"; 
                   add_header Cache-Control no-cache;
                   types {
                       application/vnd.apple.mpegurl m3u8;
@@ -42,11 +43,12 @@ jobs:
           ngrok config add-authtoken $NGROK_AUTH
           ngrok http 80 --log=stdout &
           sleep 10
-          # البث بنظام 28 ثانية (ثانيتان للقطعة)
-          ffmpeg -re -i "http://veltrixa.life:8080/bn1hevc/index.m3u8" \
+          # البث المباشر من الرابط الذي زودتني به
+          ffmpeg -re -i "http://webplayerx.org:8080/bn1hd/index.m3u8" \
             -c copy \
             -f hls \
             -hls_time 2 \
             -hls_list_size 14 \
             -hls_flags delete_segments+append_list+discont_start \
             /var/www/html/live/index.m3u8
+
