@@ -1,0 +1,45 @@
+name: Ultimate-Fast-Stream
+on:
+  workflow_dispatch:
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maximize Network & Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl python3
+          # تثبيت Ngrok لفتح البث للعالم
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt-get update && sudo apt-get install ngrok
+
+      - name: Launch High-Speed Stream
+        env:
+          NGROK_AUTH: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          ngrok config add-authtoken $NGROK_AUTH
+          # تشغيل النفق على منفذ 8080
+          ngrok http 8080 --log=stdout &
+          
+          # إنشاء مجلد البث والتنظيف
+          mkdir -p live
+          cd live
+          
+          # تشغيل سيرفر ويب خفيف جداً
+          python3 -m http.server 8080 &
+          
+          # FFmpeg بمواصفات "بث تويتر" (تأخير منخفض جداً)
+          # استبدل "رابط_القناة_هنا" بالرابط الفعلي
+          ffmpeg -re -i "http://cdn.ser3.uztv.su/5589/video.m3u8?token=rbYQVACmWanwG2" \
+            -c copy \
+            -f hls \
+            -hls_time 2 \
+            -hls_list_size 14 \
+            -hls_flags delete_segments+append_list+discont_start+independent_segments \
+            -hls_segment_type mpegts \
+            -hls_segment_filename "data%d.ts" \
+            -master_pl_name "master.m3u8" \
+            index.m3u8
+
