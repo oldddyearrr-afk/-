@@ -1,4 +1,4 @@
-name: Ultimate-Direct-Stream
+name: Ultimate-Direct-Stream-Final
 on:
   workflow_dispatch:
 
@@ -6,48 +6,39 @@ jobs:
   run-stream:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Nginx & Localtonet
+      - name: Setup Tools & Localtonet
         run: |
           sudo apt-get update
-          sudo apt-get install -y nginx ffmpeg curl
-          # تحميل أداة Localtonet
-          wget https://localtonet.com/download/localtonet-linux-x64.zip
-          unzip localtonet-linux-x64.zip
+          sudo apt-get install -y ffmpeg curl python3 unzip
+          # تحميل الأداة بسرعة
+          curl -L https://localtonet.com/download/localtonet-linux-x64.zip -o lt.zip
+          unzip lt.zip
           chmod +x localtonet
 
-      - name: Configure Nginx
-        run: |
-          sudo bash -c 'cat <<EOF > /etc/nginx/sites-available/default
-          server {
-              listen 8080;
-              location / {
-                  root /var/www/html/live;
-                  add_header Access-Control-Allow-Origin *;
-                  types {
-                      application/vnd.apple.mpegurl m3u8;
-                      video/mp2t ts;
-                  }
-              }
-          }
-          EOF'
-          sudo mkdir -p /var/www/html/live
-          sudo chmod -R 777 /var/www/html/live
-          sudo systemctl restart nginx
-
-      - name: Start Stream & Localtonet
+      - name: Launch Stream & Tunnel
         env:
           LT_TOKEN: ${{ secrets.LOCALTONET_TOKEN }}
         run: |
-          # تشغيل النفق (Tunnel) بدون أي صفحات تحذير
-          ./localtonet -t $LT_TOKEN authtoken $LT_TOKEN & 
+          # تفعيل التوكن أولاً بشكل منفصل (حل مشكلة Wrong Token)
+          ./localtonet authtoken $LT_TOKEN
+          
+          # تشغيل النفق على المنفذ 8080 في الخلفية
           ./localtonet http -p 8080 &
-          sleep 10
-          # البث المباشر المستقر
+          
+          # انتظار بسيط لربط السيرفر
+          sleep 15
+          
+          # تجهيز مجلد البث وسيرفر الويب
+          mkdir -p live
+          cd live
+          python3 -m http.server 8080 &
+          
+          # أمر البث الاحترافي (نظام 28 ثانية - تأخير 0)
           ffmpeg -re -i "http://webplayerx.org:8080/bn1hd/index.m3u8" \
             -c copy \
             -f hls \
             -hls_time 2 \
             -hls_list_size 14 \
             -hls_flags delete_segments+append_list+discont_start \
-            /var/www/html/live/index.m3u8
+            index.m3u8
 
