@@ -1,4 +1,4 @@
-name: Nginx-Direct-Stream
+name: Ultimate-Direct-Stream
 on:
   workflow_dispatch:
 
@@ -6,25 +6,23 @@ jobs:
   run-stream:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Tools
+      - name: Install Nginx & Localtonet
         run: |
           sudo apt-get update
           sudo apt-get install -y nginx ffmpeg curl
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt-get update && sudo apt-get install ngrok
+          # تحميل أداة Localtonet
+          wget https://localtonet.com/download/localtonet-linux-x64.zip
+          unzip localtonet-linux-x64.zip
+          chmod +x localtonet
 
-      - name: Configure Nginx & Bypass Warning
+      - name: Configure Nginx
         run: |
           sudo bash -c 'cat <<EOF > /etc/nginx/sites-available/default
           server {
-              listen 80;
+              listen 8080;
               location / {
                   root /var/www/html/live;
                   add_header Access-Control-Allow-Origin *;
-                  # هذا السطر يمنع ظهور صفحة تحذير ngrok نهائياً
-                  add_header ngrok-skip-browser-warning "true"; 
-                  add_header Cache-Control no-cache;
                   types {
                       application/vnd.apple.mpegurl m3u8;
                       video/mp2t ts;
@@ -36,14 +34,15 @@ jobs:
           sudo chmod -R 777 /var/www/html/live
           sudo systemctl restart nginx
 
-      - name: Start Ngrok & FFmpeg
+      - name: Start Stream & Localtonet
         env:
-          NGROK_AUTH: ${{ secrets.NGROK_AUTH_TOKEN }}
+          LT_TOKEN: ${{ secrets.LOCALTONET_TOKEN }}
         run: |
-          ngrok config add-authtoken $NGROK_AUTH
-          ngrok http 80 --log=stdout &
+          # تشغيل النفق (Tunnel) بدون أي صفحات تحذير
+          ./localtonet -t $LT_TOKEN authtoken $LT_TOKEN & 
+          ./localtonet http -p 8080 &
           sleep 10
-          # البث المباشر من الرابط الذي زودتني به
+          # البث المباشر المستقر
           ffmpeg -re -i "http://webplayerx.org:8080/bn1hd/index.m3u8" \
             -c copy \
             -f hls \
