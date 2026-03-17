@@ -1,4 +1,4 @@
-name: Ultimate-Direct-Stream-With-Link
+name: Serveo-Direct-Stream
 on:
   workflow_dispatch:
 
@@ -6,39 +6,34 @@ jobs:
   run-stream:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Tools & Localtonet
+      - name: Install FFmpeg & Python
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg curl python3 unzip jq
-          curl -L https://localtonet.com/download/localtonet-linux-x64.zip -o lt.zip
-          unzip lt.zip
-          chmod +x localtonet
+          sudo apt-get install -y ffmpeg python3
 
-      - name: Launch Stream & Show Link
-        env:
-          LT_TOKEN: ${{ secrets.LOCALTONET_TOKEN }}
+      - name: Start Stream & Get Link
         run: |
-          # تفعيل التوكن
-          ./localtonet authtoken $LT_TOKEN
-          
-          # تشغيل النفق وإظهار الرابط
-          ./localtonet http -p 8080 &
-          
-          echo "جاري استخراج الرابط المباشر... انتظر 20 ثانية"
-          sleep 20
-          
-          # استخراج الرابط وطباعته بشكل واضح
-          PUBLIC_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-          echo "----------------------------------------------------"
-          echo "رابط البث الخاص بك هو:"
-          echo "$PUBLIC_URL/index.m3u8"
-          echo "----------------------------------------------------"
-          
-          # تجهيز المجلد والبث
+          # 1. إنشاء مجلد البث وتشغيل سيرفر ويب خفيف
           mkdir -p live
           cd live
           python3 -m http.server 8080 &
           
+          # 2. تشغيل نفق Serveo والحصول على الرابط
+          # سنقوم بفتح اتصال SSH ليعطينا الرابط ويحفظه في ملف
+          ssh -o StrictHostKeyChecking=no -R 80:localhost:8080 serveo.net > link.txt 2>&1 &
+          
+          echo "جاري استخراج رابط البث المباشر..."
+          sleep 10
+          
+          # 3. استخراج الرابط من الملف وطباعته
+          SERVER_URL=$(grep -o 'https://[^ ]*' link.txt | head -1)
+          echo "----------------------------------------------------"
+          echo "✅ تم تشغيل السيرفر بنجاح"
+          echo "رابط البث الخاص بك هو:"
+          echo "$SERVER_URL/index.m3u8"
+          echo "----------------------------------------------------"
+          
+          # 4. تشغيل FFmpeg لسحب البث وتحويله
           ffmpeg -re -i "http://webplayerx.org:8080/bn1hd/index.m3u8" \
             -c copy \
             -f hls \
@@ -46,4 +41,3 @@ jobs:
             -hls_list_size 14 \
             -hls_flags delete_segments+append_list+discont_start \
             index.m3u8
-
